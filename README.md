@@ -21,7 +21,7 @@ It accomplishes this by translating standard JSON-based chat completions into AW
 
 Additionally, it features a **Web Dashboard** for managing multiple Kiro accounts, handling OAuth PKCE flows, dynamic proxy controlling, and automatic token refreshing.
 
-![Dashboard Screenshot](dashboard.png)
+![Dashboard Screenshot](dashboard.jpg)
 
 ## ✨ Features
 
