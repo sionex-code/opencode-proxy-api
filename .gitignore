@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local Data
+profiles.json
+
+# Environment
+.env
+.venv
+env/
+venv/
