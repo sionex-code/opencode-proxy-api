@@ -3,11 +3,11 @@
   <p>A robust local proxy bridging OpenAI-compatible editors with the native Kiro AWS Event Stream protocol.</p>
 
   <p>
-    <a href="https://github.com/yourusername/kiro-proxy/stargazers"><img src="https://img.shields.io/github/stars/yourusername/kiro-proxy" alt="Stars Badge"/></a>
-    <a href="https://github.com/yourusername/kiro-proxy/network/members"><img src="https://img.shields.io/github/forks/yourusername/kiro-proxy" alt="Forks Badge"/></a>
-    <a href="https://github.com/yourusername/kiro-proxy/pulls"><img src="https://img.shields.io/github/issues-pr/yourusername/kiro-proxy" alt="Pull Requests Badge"/></a>
-    <a href="https://github.com/yourusername/kiro-proxy/issues"><img src="https://img.shields.io/github/issues/yourusername/kiro-proxy" alt="Issues Badge"/></a>
-    <a href="https://github.com/yourusername/kiro-proxy/blob/main/LICENSE"><img src="https://img.shields.io/github/license/yourusername/kiro-proxy" alt="License Badge"/></a>
+    <a href="https://github.com/sionex-code/opencode-proxy-api/stargazers"><img src="https://img.shields.io/github/stars/sionex-code/opencode-proxy-api" alt="Stars Badge"/></a>
+    <a href="https://github.com/sionex-code/opencode-proxy-api/network/members"><img src="https://img.shields.io/github/forks/sionex-code/opencode-proxy-api" alt="Forks Badge"/></a>
+    <a href="https://github.com/sionex-code/opencode-proxy-api/pulls"><img src="https://img.shields.io/github/issues-pr/sionex-code/opencode-proxy-api" alt="Pull Requests Badge"/></a>
+    <a href="https://github.com/sionex-code/opencode-proxy-api/issues"><img src="https://img.shields.io/github/issues/sionex-code/opencode-proxy-api" alt="Issues Badge"/></a>
+    <a href="https://github.com/sionex-code/opencode-proxy-api/blob/main/LICENSE"><img src="https://img.shields.io/github/license/sionex-code/opencode-proxy-api" alt="License Badge"/></a>
   </p>
 </div>
 
@@ -53,8 +53,8 @@ Additionally, it features a **Web Dashboard** for managing multiple Kiro account
 Clone the repository and install the required dependencies:
 
 ```bash
-git clone https://github.com/yourusername/kiro-proxy.git
-cd kiro-proxy
+git clone https://github.com/sionex-code/opencode-proxy-api.git
+cd opencode-proxy-api
 pip install -r requirements.txt
 ```
 
@@ -105,7 +105,7 @@ It will look something like this:
 
 ## 📈 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/kiro-proxy&type=Date)](https://star-history.com/#yourusername/kiro-proxy&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=sionex-code/opencode-proxy-api&type=Date)](https://star-history.com/#sionex-code/opencode-proxy-api&Date)
 
 ## 📄 License
 
