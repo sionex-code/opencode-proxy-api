@@ -3,6 +3,8 @@ import uuid
 import time
 import traceback
 import requests
+import os
+import secrets
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 from kiro_api import KiroAPI
@@ -12,7 +14,26 @@ app = FastAPI()
 
 # ── Dynamic Kiro Auth ────────────────────────────────────────────────────────
 DASHBOARD_URL = "http://localhost:3128/api/active-profile"
-DEFAULT_MACHINE_ID = "6b0743b08cb894f098bcc462392c9224eceacc625b3e491feaec8eb9c734a989"
+
+def get_machine_id():
+    """Get or generate a persistent machine ID"""
+    machine_id_file = "machine_id.txt"
+    if os.path.exists(machine_id_file):
+        try:
+            with open(machine_id_file, "r") as f:
+                return f.read().strip()
+        except Exception as e:
+            print(f"[PROXY] Warning: Could not read {machine_id_file}: {e}")
+    
+    new_id = secrets.token_hex(32)
+    try:
+        with open(machine_id_file, "w") as f:
+            f.write(new_id)
+    except Exception as e:
+        print(f"[PROXY] Warning: Could not save machine ID: {e}")
+    return new_id
+
+MACHINE_ID = get_machine_id()
 
 def get_active_kiro_api():
     """Fetch the active profile from the dashboard and return a KiroAPI instance"""
@@ -22,7 +43,7 @@ def get_active_kiro_api():
             data = resp.json()
             return KiroAPI(
                 auth_token=data["access_token"],
-                machine_id=DEFAULT_MACHINE_ID,
+                machine_id=MACHINE_ID,
                 profile_arn=data["profile_arn"]
             )
     except Exception as e:
@@ -37,7 +58,7 @@ def get_active_kiro_api():
                 if p["id"] == active_id:
                     return KiroAPI(
                         auth_token=p["access_token"],
-                        machine_id=DEFAULT_MACHINE_ID,
+                        machine_id=MACHINE_ID,
                         profile_arn=p["profile_arn"]
                     )
     except:
