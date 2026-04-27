@@ -162,6 +162,19 @@ def generate_pkce():
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
+    oauth_flow["verifier"], oauth_flow["challenge"] = generate_pkce()
+    oauth_flow["state"] = secrets.token_urlsafe(16)
+    
+    params = {
+        "state": oauth_flow["state"],
+        "code_challenge": oauth_flow["challenge"],
+        "code_challenge_method": "S256",
+        "redirect_uri": "http://localhost:3128",
+        "redirect_from": "KiroIDE"
+    }
+    encoded = urllib.parse.urlencode(params)
+    signin_url = f"https://app.kiro.dev/signin?{encoded}"
+
     data = load_profiles()
     profiles = data.get("profiles", [])
     active_id = data.get("active_profile_id")
@@ -265,6 +278,36 @@ async def dashboard(request: Request):
     </script>
     """
 
+    add_account_modal = f"""
+    <div id="addAccountModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+        <div style="background:white; padding:24px; border-radius:12px; width:90%; max-width:500px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <h2 style="margin:0; color:#2d3748;">Add Account</h2>
+                <button onclick="closeModal()" style="background:none; border:none; font-size:24px; cursor:pointer; color:#718096; padding:0;">&times;</button>
+            </div>
+            <p style="color:#718096; margin-bottom:16px;">Authenticate via the Kiro portal. Copy the link or open it in your browser.</p>
+            <textarea id="authUrl" rows="4" style="width:100%; padding:12px; font-size:14px; background:#edf2f7; border:1px solid #cbd5e0; border-radius:6px; margin-bottom:16px; resize:none; box-sizing:border-box;" readonly>{{signin_url}}</textarea>
+            <div style="display:flex; justify-content:flex-end;">
+                <button onclick="copyAuthUrl()" style="background:#edf2f7; color:#2d3748; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-weight:bold; margin-right:8px; font-size:14px;">Copy URL</button>
+                <a href="{{signin_url}}" target="_blank" style="background:#3182ce; color:white; padding:10px 16px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">Open Browser</a>
+            </div>
+            <p id="modalMsg" style="color:#48bb78; font-size:14px; margin-top:16px; text-align:right; display:none; font-weight:bold;">Copied to clipboard!</p>
+        </div>
+    </div>
+    <script>
+        function openModal() {{ document.getElementById('addAccountModal').style.display = 'flex'; }}
+        function closeModal() {{ document.getElementById('addAccountModal').style.display = 'none'; }}
+        function copyAuthUrl() {{
+            var copyText = document.getElementById("authUrl");
+            copyText.select();
+            copyText.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(copyText.value);
+            document.getElementById("modalMsg").style.display = "block";
+            setTimeout(() => {{ document.getElementById("modalMsg").style.display = "none"; }}, 3000);
+        }}
+    </script>
+    """
+
     return f"""
     <html>
     <head>
@@ -274,15 +317,16 @@ async def dashboard(request: Request):
             body {{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background:#f7fafc; color:#1a202c; line-height:1.5; }}
             .container {{ max-width: 600px; margin: 40px auto; padding: 0 20px 40px 20px; }}
             .header {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; }}
-            .btn-add {{ background:#2d3748; color:white; padding:10px 20px; text-decoration:none; border-radius:8px; font-weight:600; transition:all 0.2s; }}
+            .btn-add {{ background:#2d3748; color:white; padding:10px 20px; border:none; border-radius:8px; font-weight:600; cursor:pointer; font-size:16px; transition:all 0.2s; }}
             .btn-add:hover {{ background:#1a202c; transform:translateY(-1px); }}
         </style>
     </head>
     <body>
+        {add_account_modal}
         <div class="container">
             <div class="header">
                 <h1 style="margin:0; font-size:24px; padding-top:40px;">Kiro Profiles</h1>
-                <a href="/add" class="btn-add" style="margin-top:40px;">+ Add Account</a>
+                <button onclick="openModal()" class="btn-add" style="margin-top:40px;">+ Add Account</button>
             </div>
             {proxy_status_html}
             <h2 style="font-size:18px; margin-bottom:16px;">Accounts</h2>
@@ -304,64 +348,7 @@ async def toggle_proxy():
         start_proxy()
     return RedirectResponse("/")
 
-@app.get("/add", response_class=HTMLResponse)
-async def add_profile_start():
-    oauth_flow["verifier"], oauth_flow["challenge"] = generate_pkce()
-    oauth_flow["state"] = secrets.token_urlsafe(16)
-    
-    params = {
-        "state": oauth_flow["state"],
-        "code_challenge": oauth_flow["challenge"],
-        "code_challenge_method": "S256",
-        "redirect_uri": "http://localhost:3128",
-        "redirect_from": "KiroIDE"
-    }
-    encoded = urllib.parse.urlencode(params)
-    signin_url = f"https://app.kiro.dev/signin?{encoded}"
-    
-    return f"""
-    <html>
-    <head>
-        <title>Add Kiro Account</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-            body {{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background:#f7fafc; color:#1a202c; line-height:1.5; }}
-            .container {{ max-width: 600px; margin: 40px auto; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }}
-            .input-box {{ width: 100%; padding: 12px; font-size: 14px; color: #4a5568; background: #edf2f7; border: 1px solid #cbd5e0; border-radius: 6px; box-sizing: border-box; margin-bottom: 16px; word-break: break-all; resize: none; }}
-            .btn {{ background:#3182ce; color:white; padding:10px 20px; text-decoration:none; border-radius:8px; font-weight:600; cursor:pointer; border:none; font-size:14px; display:inline-block; }}
-            .btn:hover {{ background:#2b6cb0; }}
-            .btn-secondary {{ background:#edf2f7; color:#2d3748; margin-left:8px; }}
-            .btn-secondary:hover {{ background:#e2e8f0; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2 style="margin-top:0;">Login Required</h2>
-            <p style="color:#718096; margin-bottom:24px;">To add a new account, please authenticate via the Kiro portal. You can copy the link below to open it in another browser, or click the button to continue in this browser.</p>
-            
-            <textarea class="input-box" id="authUrl" rows="4" readonly>{signin_url}</textarea>
-            
-            <div style="display:flex; justify-content:flex-end;">
-                <button class="btn btn-secondary" onclick="copyUrl()">Copy URL</button>
-                <a href="{signin_url}" class="btn">Open in this Browser</a>
-            </div>
-            
-            <p id="msg" style="color:#48bb78; font-size:14px; margin-top:16px; text-align:right; display:none;">Copied to clipboard!</p>
-        </div>
-        
-        <script>
-            function copyUrl() {{
-                var copyText = document.getElementById("authUrl");
-                copyText.select();
-                copyText.setSelectionRange(0, 99999);
-                navigator.clipboard.writeText(copyText.value);
-                document.getElementById("msg").style.display = "block";
-                setTimeout(() => {{ document.getElementById("msg").style.display = "none"; }}, 3000);
-            }}
-        </script>
-    </body>
-    </html>
-    """
+
 
 @app.get("/oauth/callback")
 async def oauth_callback(code: str, state: str, login_option: str = "google"):
