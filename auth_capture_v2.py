@@ -286,10 +286,10 @@ async def dashboard(request: Request):
                 <button onclick="closeModal()" style="background:none; border:none; font-size:24px; cursor:pointer; color:#718096; padding:0;">&times;</button>
             </div>
             <p style="color:#718096; margin-bottom:16px;">Authenticate via the Kiro portal. Copy the link or open it in your browser.</p>
-            <textarea id="authUrl" rows="4" style="width:100%; padding:12px; font-size:14px; background:#edf2f7; border:1px solid #cbd5e0; border-radius:6px; margin-bottom:16px; resize:none; box-sizing:border-box;" readonly>{{signin_url}}</textarea>
+            <textarea id="authUrl" rows="4" style="width:100%; padding:12px; font-size:14px; background:#edf2f7; border:1px solid #cbd5e0; border-radius:6px; margin-bottom:16px; resize:none; box-sizing:border-box;" readonly>{signin_url}</textarea>
             <div style="display:flex; justify-content:flex-end;">
                 <button onclick="copyAuthUrl()" style="background:#edf2f7; color:#2d3748; padding:10px 16px; border:none; border-radius:8px; cursor:pointer; font-weight:bold; margin-right:8px; font-size:14px;">Copy URL</button>
-                <a href="{{signin_url}}" target="_blank" style="background:#3182ce; color:white; padding:10px 16px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">Open Browser</a>
+                <a href="{signin_url}" target="_blank" style="background:#3182ce; color:white; padding:10px 16px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">Open Browser</a>
             </div>
             <p id="modalMsg" style="color:#48bb78; font-size:14px; margin-top:16px; text-align:right; display:none; font-weight:bold;">Copied to clipboard!</p>
         </div>
