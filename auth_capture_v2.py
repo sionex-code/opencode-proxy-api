@@ -253,6 +253,13 @@ async def dashboard(request: Request):
         "apiKey": "dummy-key-not-used-by-proxy"
       },
       "models": {
+        "claude-sonnet-4.0": {
+          "name": "Claude Sonnet 4.0 (via Kiro)",
+          "limit": {
+            "context": 200000,
+            "output": 65536
+          }
+        },
         "claude-sonnet-4.5": {
           "name": "Claude Sonnet 4.5 (via Kiro)",
           "limit": {
