@@ -4,6 +4,15 @@ import struct
 import requests
 from typing import List, Dict, Any, Optional
 
+
+class KiroStreamError(Exception):
+    """Raised when the backend returns a non-event-stream error payload."""
+
+    def __init__(self, message: str, status_code: Optional[int] = None, payload: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.payload = payload or {}
+
 class KiroAPI:
     """
     Kiro API Client for interacting with telemetry and assistant response generation.
@@ -168,14 +177,20 @@ class KiroAPI:
                 
                 if total_length < 16 or total_length > 1048576:
                     # Invalid frame - likely not binary event stream
+                    error_text = buffer.decode('utf-8', errors='replace')
+                    error_payload = None
+                    error_message = error_text.strip() or "Kiro returned a non-stream response"
+
+                    try:
+                        error_payload = json.loads(error_text)
+                        error_message = error_payload.get("message") or error_payload.get("error") or error_message
+                    except Exception:
+                        pass
+
                     if debug:
                         print(f"  [PARSE] INVALID frame size {total_length}, dumping buffer as text:", flush=True)
-                        try:
-                            print(f"  [PARSE] TEXT: {buffer[:500].decode('utf-8', errors='replace')}", flush=True)
-                        except:
-                            print(f"  [PARSE] RAW: {buffer[:200]}", flush=True)
-                    buffer = b''
-                    break
+                        print(f"  [PARSE] TEXT: {error_text[:500]}", flush=True)
+                    raise KiroStreamError(error_message, status_code=response.status_code, payload=error_payload)
                 
                 if len(buffer) < total_length:
                     break  # Wait for more data

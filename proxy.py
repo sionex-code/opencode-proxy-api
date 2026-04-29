@@ -7,13 +7,15 @@ import os
 import secrets
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, JSONResponse
-from kiro_api import KiroAPI
+from kiro_api import KiroAPI, KiroStreamError
 import uvicorn
 
 app = FastAPI()
 
 # ── Dynamic Kiro Auth ────────────────────────────────────────────────────────
 DASHBOARD_URL = "http://localhost:3128/api/active-profile"
+DEFAULT_OPENAI_MODEL = os.environ.get("OPENAI_MODEL_NAME", "claude-sonnet-4.5")
+DEFAULT_KIRO_MODEL = os.environ.get("KIRO_MODEL_ID", DEFAULT_OPENAI_MODEL)
 
 def get_machine_id():
     """Get or generate a persistent machine ID"""
@@ -83,18 +85,45 @@ except FileNotFoundError:
 KIRO_SYSTEM_PREAMBLE = """You are Kiro, an AI coding assistant. You help users with coding tasks. You can read files, write files, search code, and run commands. Always be helpful and concise."""
 
 
-def convert_messages(messages):
+def stringify_message_content(content):
+    """Normalize OpenAI message content into a plain string."""
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                if item.get("type") == "text":
+                    parts.append(item.get("text", ""))
+                elif item.get("type") == "input_text":
+                    parts.append(item.get("text", ""))
+                else:
+                    # Skip non-text content parts that Kiro cannot consume here.
+                    continue
+        return "\n".join(part for part in parts if part)
+    return str(content)
+
+
+def convert_messages(messages, model_id):
     history = []
     
     # 1. Collect system prompt
-    system_prompt = "\n\n".join([m.get("content", "") for m in messages if m.get("role") == "system"])
+    system_prompt = "\n\n".join([
+        stringify_message_content(m.get("content", ""))
+        for m in messages
+        if m.get("role") == "system"
+    ])
     full_system = (system_prompt.strip() or KIRO_SYSTEM_PREAMBLE)
     
     # Inject system prompt as first history pair (Kiro pattern)
     history.append({
         "userInputMessage": {
             "content": full_system,
-            "modelId": "claude-sonnet-4.5",
+            "modelId": model_id,
             "origin": "AI_EDITOR"
         }
     })
@@ -127,10 +156,10 @@ def convert_messages(messages):
             
             for msg in block["messages"]:
                 if msg.get("role") == "user":
-                    content_parts.append(msg.get("content", ""))
+                    content_parts.append(stringify_message_content(msg.get("content", "")))
                 elif msg.get("role") == "tool":
                     tc_id = msg.get("tool_call_id", "unknown")
-                    tc_content = msg.get("content", "")
+                    tc_content = stringify_message_content(msg.get("content", ""))
                     content_parts.append(f"Tool result for {tc_id}:\n{tc_content}")
                     tool_results.append({
                         "content": [{"text": tc_content}],
@@ -140,7 +169,7 @@ def convert_messages(messages):
             
             user_msg = {
                 "content": "\n\n".join(content_parts),
-                "modelId": "claude-sonnet-4.5",
+                "modelId": model_id,
                 "origin": "AI_EDITOR"
             }
             if tool_results:
@@ -153,7 +182,7 @@ def convert_messages(messages):
             tool_uses = []
             
             for msg in block["messages"]:
-                content_parts.append(msg.get("content") or "")
+                content_parts.append(stringify_message_content(msg.get("content") or ""))
                 if msg.get("tool_calls"):
                     for tc in msg["tool_calls"]:
                         tool_uses.append({
@@ -180,10 +209,10 @@ def convert_messages(messages):
             content_parts = []
             for msg in last_block["messages"]:
                 if msg.get("role") == "user":
-                    content_parts.append(msg.get("content", ""))
+                    content_parts.append(stringify_message_content(msg.get("content", "")))
                 elif msg.get("role") == "tool":
                     tc_id = msg.get("tool_call_id", "unknown")
-                    tc_content = msg.get("content", "")
+                    tc_content = stringify_message_content(msg.get("content", ""))
                     content_parts.append(f"Tool result for {tc_id}:\n{tc_content}")
                     current_tool_results.append({
                         "content": [{"text": tc_content}],
@@ -198,7 +227,7 @@ def convert_messages(messages):
             content_parts = []
             tool_uses = []
             for msg in last_block["messages"]:
-                content_parts.append(msg.get("content") or "")
+                content_parts.append(stringify_message_content(msg.get("content") or ""))
                 if msg.get("tool_calls"):
                     for tc in msg["tool_calls"]:
                         tool_uses.append({
@@ -224,7 +253,7 @@ async def list_models():
         "object": "list",
         "data": [
             {
-                "id": "claude-sonnet-4.5",
+                "id": DEFAULT_OPENAI_MODEL,
                 "object": "model",
                 "created": int(time.time()),
                 "owned_by": "kiro"
@@ -259,7 +288,8 @@ async def chat_completions(request: Request):
         return JSONResponse(status_code=400, content={"error": "Invalid JSON body"})
 
     messages = data.get("messages", [])
-    model = data.get("model", "claude-sonnet-4.5")
+    model = data.get("model", DEFAULT_OPENAI_MODEL)
+    backend_model = DEFAULT_KIRO_MODEL
     stream = data.get("stream", False)
     openai_tools = data.get("tools", [])
 
@@ -267,7 +297,7 @@ async def chat_completions(request: Request):
     print(f"[PROXY] Incoming  stream={stream}  messages={len(messages)} tools={len(openai_tools)}")
     for m in messages:
         role = m.get("role")
-        content = (m.get("content") or "")[:80]
+        content = stringify_message_content(m.get("content") or "")[:80]
         extra = ""
         if m.get("tool_calls"):
             extra = f" [+{len(m['tool_calls'])} tool_calls]"
@@ -276,7 +306,7 @@ async def chat_completions(request: Request):
         print(f"  [{role}] {content}{extra}")
     print(f"{'='*60}")
 
-    history, current_content, current_tool_results = convert_messages(messages)
+    history, current_content, current_tool_results = convert_messages(messages, backend_model)
     
     # Translate OpenAI tools to Kiro tools
     kiro_tools = convert_tools(openai_tools) if openai_tools else KIRO_NATIVE_TOOLS
@@ -294,7 +324,7 @@ async def chat_completions(request: Request):
         conversation_id=conversation_id,
         agent_continuation_id=continuation_id,
         history=history,
-        model_id="claude-sonnet-4.5",
+        model_id=backend_model,
         agent_task_type="vibe",
         agent_mode="vibe",
         tools=kiro_tools,
@@ -308,7 +338,19 @@ async def chat_completions(request: Request):
     if stream:
         return StreamingResponse(_stream_sse(api, kiro_response, model), media_type="text/event-stream")
     else:
-        return _non_stream_response(api, kiro_response, model)
+        try:
+            return _non_stream_response(api, kiro_response, model)
+        except KiroStreamError as e:
+            return JSONResponse(
+                status_code=e.status_code or 502,
+                content={
+                    "error": {
+                        "message": str(e),
+                        "type": e.payload.get("reason", "kiro_backend_error") if e.payload else "kiro_backend_error",
+                        "details": e.payload,
+                    }
+                },
+            )
 
 
 def _stream_sse(api, kiro_response, model):
@@ -431,6 +473,22 @@ def _stream_sse(api, kiro_response, model):
         }
         print(f"[SSE] finish_reason={finish_reason}  total_events={event_count}", flush=True)
         yield f"data: {json.dumps(final_chunk)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    except KiroStreamError as e:
+        print(f"[SSE ERROR] {e}")
+        err_chunk = {
+            "id": resp_id,
+            "object": "chat.completion.chunk",
+            "created": created,
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "delta": {"role": "assistant", "content": f"\n\n[Proxy Error: {e}]"},
+                "finish_reason": "stop"
+            }]
+        }
+        yield f"data: {json.dumps(err_chunk)}\n\n"
         yield "data: [DONE]\n\n"
 
     except Exception as e:
